@@ -1,0 +1,13 @@
+__pycache__
+.DS_Store
+.vscode/launch.json
+.env
+settings.yaml
+interactive.yaml
+dist
+poetry.lock
+node_modules/
+.next/
+.env
+.env.local
+.vercel

@@ -1,0 +1,101 @@
+参考代码：/Users/zhangbeibei/code/github/AnnaAgent/api_server.py
+/Users/zhangbeibei/code/github/AnnaAgent/fixed_ms_patient.py
+这是我原本的后端对话逻辑，每一轮对话完会返回病人的回复、情绪、主述认知，
+
+现在要求你也得这样前端每一轮对话返回并显示回复、情绪、主述认知然后 显示在前端，其中情绪不仅要汉字还得要有表情。这个情绪和主述认知显示要合理哦。
+response, emotion, complaint = patient.chat(request.message)
+    def chat(self, message: str):
+        """调用底层并始终返回 (response, emotion, complaint) 三元组。"""
+        try:
+            result = self.ms_patient.chat(message)
+            if isinstance(result, tuple) and len(result) == 3:
+                response, emotion, complaint = result
+            elif isinstance(result, str):
+                response, emotion, complaint = result, "neutral", "unknown"
+            else:
+                response, emotion, complaint = (
+                    "抱歉，我刚才走神了...最近工作太忙，脑子有点乱。你刚才说什么？",
+                    "neutral",
+                    "unknown",
+                )
+
+            if not response or (isinstance(response, str) and response.strip() == ""):
+                logger.warning(
+                    "FixedMsPatient returned empty response - this should not happen"
+                )
+                return (
+                    "抱歉，我刚才走神了...最近工作太忙，脑子有点乱。你刚才说什么？",
+                    emotion or "neutral",
+                    complaint or "unknown",
+                )
+
+            return response, emotion, complaint
+
+        except Exception as e:
+            logger.error(f"Unexpected error in SafeMsPatientWrapper: {str(e)}")
+            return (
+                "不好意思，我在想工作的事情...能再说一遍吗？",
+                "neutral",
+                "unknown",
+            )
+class FixedMsPatient(OriginalMsPatient):
+    """修复list index out of range错误的MsPatient版本"""
+
+    def chat(self, message):
+        # 更新消息列表
+        self.conversation.append({"role": "Counselor", "content": message})
+        self.messages.append({"role": "user", "content": message})
+
+        try:
+            # 使用父类的所有初始化逻辑
+            from src.anna_agent.emotion_modulator import emotion_modulation
+            from src.anna_agent.complaint_elicitor import switch_complaint, transform_chain
+            from src.anna_agent.querier import query, is_need
+
+            # 初始化本次对话的状态
+            emotion = emotion_modulation(self.portrait, self.conversation)
+            self.chain_index = switch_complaint(
+                self.complaint_chain, self.chain_index, self.conversation
+            )
+            logger.info(f"complaint_chain: {self.complaint_chain}")
+            complaint = transform_chain(self.complaint_chain)[self.chain_index]
+
+            # 判断是否涉及前疗程内容
+            if is_need(message):
+                # 生成前疗程内容
+                sup_information = query(
+                    message, self.previous_conversations, self.report
+                )
+
+                # 生成回复
+                messages = (
+                    [{"role": "system", "content": self.system}]
+                    + self.messages
+                    + [{"role": "system", "content": f"当前的情绪状态是：{emotion}，当前的主诉是：{complaint}，涉及到之前疗程的信息是：{sup_information}"}]
+                )
+                print("=== FINAL MESSAGES (with sup_information) ===")
+                print(messages)
+
+                response = self._safe_openai_call(messages)
+            else:
+                # 生成回复
+                messages = (
+                    [{"role": "system", "content": self.system}]
+                    + self.messages
+                    + [{"role": "system", "content": f"当前的情绪状态是：{emotion}，当前的主诉是：{complaint}"}]
+                )
+                print("=== FINAL MESSAGES (without sup_information) ===")
+                print(messages)
+                response = self._safe_openai_call(messages)
+
+            # 安全地提取响应内容
+            response_content = self._extract_response_content(response)
+
+            # 更新消息列表
+            self.conversation.append(
+                {"role": "Seeker", "content": response_content}
+            )
+            self.messages.append(
+                {"role": "assistant", "content": response_content}
+            )
+            return response_content, emotion, complaint

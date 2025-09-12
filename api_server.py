@@ -180,14 +180,7 @@ class PatientListResponse(BaseModel):
     page: int
     page_size: int
 
-# Default patient profile for simple chat
-DEFAULT_PROFILE = {
-    "age": "28",
-    "gender": "男",
-    "occupation": "软件工程师",
-    "martial_status": "未婚",
-    "symptoms": "工作焦虑，失眠"
-}
+
 
 DEFAULT_REPORT = {"案例标题": "工作压力咨询"}
 
@@ -198,7 +191,7 @@ async def root():
         "version": "0.1.0",
         "endpoints": {
             "patients_list": "/api/patients",
-            "patient_detail": "/api/patients/{patient_id}", 
+            "patient_detail": "/api/patients/{patient_id}",
             "create_session": "/api/sessions",
             "create_session_by_id": "/api/sessions/by_id",
             "session_chat": "/api/sessions/{session_id}/chat",
@@ -217,41 +210,41 @@ async def get_patients(page: int = 1, page_size: int = 10, random_order: bool = 
     try:
         ids = dataset_loader.list_ids()
         total = len(ids)
-        
+
         # 如果需要随机排序
         if random_order:
             import random
             ids = random.sample(ids, len(ids))
-        
+
         # 分页处理
         start_idx = (page - 1) * page_size
         end_idx = start_idx + page_size
         page_ids = ids[start_idx:end_idx]
-        
+
         patients = []
         for patient_id in page_ids:
             try:
                 record = dataset_loader.get_by_id(patient_id)
                 portrait, report, conversation, _, chain = dataset_loader.try_map_to_components(record)
-                
+
                 # 解析症状列表
                 symptoms_str = portrait.get("symptoms", "")
                 symptoms = [s.strip() for s in symptoms_str.split(";") if s.strip()] if symptoms_str else []
-                
+
                 # 生成病人摘要
                 case_title = report.get("案例标题", "心理咨询案例")
-                
+
                 # 根据症状和案例类型判断难度
                 difficulty = "初级"
                 if "抑郁" in symptoms_str or "焦虑" in symptoms_str:
                     difficulty = "中级"
                 if "精神" in symptoms_str or "幻听" in symptoms_str or "双相" in symptoms_str:
                     difficulty = "高级"
-                
+
                 # 生成描述
                 case_categories = report.get("案例类别", [])
                 description = f"{portrait.get('age')}岁{portrait.get('gender')}性，{portrait.get('occupation')}，主要涉及{' '.join(case_categories[:2]) if case_categories else '心理健康'}问题"
-                
+
                 patient_summary = PatientSummary(
                     id=patient_id,
                     name=f"{portrait.get('gender')}性求助者",  # 保护隐私，不使用真实姓名
@@ -267,7 +260,7 @@ async def get_patients(page: int = 1, page_size: int = 10, random_order: bool = 
             except Exception as e:
                 logger.warning(f"Error processing patient {patient_id}: {str(e)}")
                 continue
-        
+
         return PatientListResponse(
             patients=patients,
             total=total,
@@ -286,10 +279,10 @@ async def get_patient_detail(patient_id: str):
     try:
         record = dataset_loader.get_by_id(patient_id)
         portrait, report, conversation, seeker_prompt, chain = dataset_loader.try_map_to_components(record)
-        
+
         # 处理对话预览（前几条消息）
         conversation_preview = conversation[:6] if conversation else []
-        
+
         # 处理chain格式
         formatted_chain = []
         if isinstance(chain, list):
@@ -304,7 +297,7 @@ async def get_patient_detail(patient_id: str):
                         "stage": i + 1,
                         "content": str(item)
                     })
-        
+
         return PatientDetail(
             id=patient_id,
             profile=PatientProfile(**portrait),
@@ -349,7 +342,7 @@ async def create_session(request: CreateSessionRequest):
             "martial_status": request.profile.martial_status,
             "symptoms": request.profile.symptoms
         }
-        
+
         report = request.report or {"title": "自定义咨询案例"}
         previous_conversations = request.previous_conversations or []
         seeker_prompt = request.seeker_prompt or ""

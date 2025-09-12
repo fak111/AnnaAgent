@@ -1,0 +1,96 @@
+一、项目背景及现状
+	1.	现有架构
+	•	后端：使用 Python 和 Uvicorn 提供 REST API，配置在 api_server.py 中。涉及患者数据获取、会话管理、DeepSeek API 调用等逻辑。/Users/zhangbeibei/code/github/AnnaAgent/api_server.py
+	•	前端：基于 Vite 搭建，运行在 http://localhost:3000/。/Users/zhangbeibei/code/github/AnnaAgent/fronted
+	•	配置文件：定义了 DeepSeek 相关模型、API Key 和 Base URL 等信息，以及量表初始化配置 (scales_config)。
+	•	数据文件：后端依赖数据库文件 merged_data.json，位于 /Users/zhangbeibei/code/github/AnnaAgent/ref/merged_data.json。
+	2.	目录结构
+	•	项目根目录：/Users/zhangbeibei/code/github/AnnaAgent/
+	•	计划将前端与后端统一迁移到 deploy 目录中：/Users/zhangbeibei/code/github/AnnaAgent/deploy/
+	3.	启动方式
+	•	后端：使用虚拟环境运行 api_server.py，通过 Uvicorn 监听端口 8080。
+	•	前端：在 fronted 目录执行 npm run dev，使用 Vite 启动。
+
+
+
+二、迁移目标
+	•	后端完全迁移为 Next.js Framework：将现有 Python 后端 API 重写为 Next.js API 路由，统一使用 Node.js 运行。
+	•	统一前后端目录：新的 Next.js 项目和前端代码都放置在 deploy 目录中。
+	•	DeepSeek API 调用：确保在 Next.js 中通过 Node.js 的 fetch 或 axios 调用 DeepSeek API，并正确处理异步、错误等。
+	•	数据库文件管理：将 merged_data.json 放到 Next.js 项目的合适位置（例如 public 或自定义目录），供 API 访问。
+	•	环境变量配置：将 DeepSeek 的 API KEY、Base URL 等敏感信息存放到 Next.js 的 .env.local 中，并在代码中使用 process.env 读取。
+	•	前端整合：将现有 Vite 前端迁移或整合到 Next.js 的 app 或 pages 目录，充分利用 SSR 或静态生成，并确保与新的 API 路由交互正常。
+
+⸻
+
+三、任务步骤
+	1.	分析现有 Python 后端
+	•	阅读 api_server.py 和相关模块，梳理所有 API 端点及其逻辑（如患者列表、会话创建、聊天接口等）。
+	•	确认与 DeepSeek API 调用的方式、参数和返回值格式。
+	2.	创建 Next.js 项目
+	•	在 deploy 目录下初始化 Next.js 应用：npx create-next-app@latest 或手动创建目录结构。
+	•	配置基础目录，如 app 或 pages 用于路由，以及 public 用于静态资源。
+	3.	迁移数据文件
+	•	将 /Users/zhangbeibei/code/github/AnnaAgent/ref/merged_data.json 拷贝到新的 Next.js 项目中，例如放置于 deploy/public/ 下或自定义数据目录。
+	•	确保 API 路由可以读取该 JSON 文件用于数据访问。
+	4.	配置环境变量
+	•	在 Next.js 项目根目录创建 .env.local，设置以下变量：
+
+DEEPSEEK_API_KEY=<原配置中的 API Key>
+DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+
+
+	•	代码中通过 process.env.DEEPSEEK_API_KEY 等读取。
+
+	5.	将 Python API 端点转换为 Next.js API 路由
+	•	在 deploy/pages/api 或 deploy/src/pages/api 下创建对应端点文件，例如：
+	•	pages/api/patients.js —— 对应 /api/patients，实现分页、随机顺序等逻辑。
+	•	pages/api/sessions/[id].js —— 对应会话管理。
+	•	pages/api/deepseek.js —— 封装对 DeepSeek 的聊天 API 调用。
+	•	使用 Node.js 的 fetch（或 axios）发送 HTTP 请求到 DeepSeek API，处理请求体、响应和错误。
+	6.	实现 DeepSeek 调用逻辑
+	•	参考现有 Python 代码中 httpx 的调用，转换成 axios 或 fetch 版本，注意传递 Authorization 和适当的 headers。
+	•	封装为可复用函数，供多个 API 路由调用。
+	7.	整合前端代码
+	•	评估现有 Vite 前端组件和逻辑，将其迁移到 Next.js：
+	•	可以放在 app 目录中并利用 React 服务器组件。
+	•	调整前端 API 调用路径，确保指向新的 Next.js API 路由。
+	•	处理可能的 CORS 问题（Next.js API 本身可以与前端共域，不需要额外 CORS 设置）。
+	•	如果暂不迁移前端 UI，至少确保它能够通过新的 API 路由进行数据交互。
+	8.	测试功能完整性
+	•	对每个迁移后的 API 端点进行单元和集成测试，确认返回数据格式与原 Python 一致。
+	•	验证 DeepSeek API 调用在 Node.js 环境下的正确性和稳定性。
+	•	检查前端页面是否能正确渲染数据，聊天功能和会话管理是否正常。
+	9.	部署配置
+	•	编写或更新 next.config.js，设置必要的环境变量导入、构建配置、API 代理等。
+	•	准备部署到支持 Next.js 的平台（如 Vercel）的配置，确保构建脚本和环境变量生效。
+	•	删除或归档旧的 Python 后端文件，保持目录整洁。
+	10.	根据需要与用户沟通
+	•	如果迁移前端至 Next.js 还是保持 Vite 架构有不确定性，需与用户确认最佳方案。
+	•	过程中的重要决策或潜在不兼容问题，可使用 ask_followup_question 工具征求用户意见。
+
+
+这样整理后，可以作为改造项目的实施指南，逐步完成 Python 后端到 Next.js 框架的迁移，并统一前后端项目结构。
+
+## 注意
+后端依赖了这么多文件 # Import existing AnnaAgent components
+from src.anna_agent.backbone import configure
+from fixed_ms_patient import FixedMsPatient
+from src.anna_agent.dataset_loader import DatasetLoader
+from src.anna_agent.complaint_chain import gen_complaint_chain
+只要逻辑复原即可
+
+
+迁移原则
+整体最小改动 目前前后端实现是通的，迁移逻辑不要动。。
+但为了方便 vertaix 部署，请将文件放到 deploy 目录下
+
+并且写代码时候注意这点，我们重构的代码不仅本地可以跑，还要可以部署到 vertaix 上。
+并且要注意 前后端交互的逻辑，不要破坏原有的逻辑。
+
+当然第一步是本地跑起来
+精简 、性能要好 、代码整洁、模块清晰
+改完代码后，要写单元测试和集成测试，确保代码质量。
+然后本地跑起来 我检查。
+总结改成next.js最后只需要一行：总结：在开发环境下，npm run dev 就足够启动 Next.js 项目，
+就可以启动。

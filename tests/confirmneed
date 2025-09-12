@@ -1,0 +1,59 @@
+
+
+  - 目标平台确认：“vertaix”是指 Vercel。
+  - Next.js 路由选择：倾向使用 pages/api（与现有前端调用习惯最兼容），还是采用 App
+  Router app/api？为“最小改动”，我建议优先 pages/api。
+  - 前端策略：是“立即将 Vite 前端整合进 Next.js（统一工程）”，要改就改彻底。
+  - DeepSeek 细节：是否需要流式响应（SSE）？当前 Python 端的模型、温度、系统提示、
+  消息格式、重试策略、超时参数是否照搬？需要这个是重中之重。
+  - 会话与状态：Python 端会话是内存态还是落盘？是否需要跨进程/多副本共享（若要部署
+  到 Vercel/Cloud Run，需无状态化或外部存储）？这个你自己看对应对话状态怎么保存，有样学样。
+  - 数据文件：merged_data.json 是否包含敏感数据？可否避免暴露在 public/ 并改为
+  deploy/data/merged_data.json 由 API 读取（更安全）？看后端怎么读的吧，简洁优雅的方式读就好了。
+  - 兼容性：Node.js 版本要求（建议 Node 18/20），以及是否允许引入 axios 还是统一使
+  用原生 fetch？ 允许引入axios。
+
+  Proposed TODOs
+
+  - 后端（Next.js API）
+      - 列出并对齐 Python 端点契约：/api/patients、/api/sessions/*、/api/chat/
+  deepseek 等，确认请求/响应格式完全一致。 你看对应后端代码怎么写的。逻辑复制就好
+      - 初始化 Next.js 至 deploy/（使用 Pages Router）；设 src/pages/api 目录结构
+  与端点一一对应。。
+      - 深拷贝/移植业务逻辑：分页、随机顺序、会话创建/查询、消息处理，保持与
+  api_server.py 的逻辑等价。
+      - 封装 DeepSeek 客户端：基于 fetch（或 axios）实现 headers、超时、错误分类、
+  可选重试，提供纯函数接口复用。
+      - 数据访问层：从 deploy/data/merged_data.json 读取，提供 read-only 查询接
+  口；定义类型与最小缓存以提升响应。
+      - 环境变量：支持 DEEPSEEK_API_KEY、DEEPSEEK_BASE_URL，默认从 .env.local 读
+  取；校验缺失时返回 500 且日志提示。
+  - 前端（迁移或联通）
+      - 方案A（立即整合）：将 Vite 组件迁移到 Next.js（pages/ 或 app/），替换 API
+  基址为相对 /api/*。按现有 UI 结构映射页面。
+      - 方案B（阶段性联通）：保留 Vite 前端，先把 API 指向新 Next.js API，验证功能
+  后再合并工程。
+      - 统一聊天与会话调用：复用与 Python 等价的数据结构，避免前端改动。
+  - 测试与质量
+      - 单元测试：数据访问层、DeepSeek 客户端、分页与会话逻辑（Jest/Vitest + ts-
+  jest 或纯 JS）。 可以
+      - 集成测试：使用 supertest 对 Next.js API 端点做请求级验证，覆盖成功/失败/
+  边界。可以
+      - 端到端冒烟：本地 npm run dev 启动，串联前端页面与 API 路由，验证患者列表、
+  创建会话、聊天问答。可以
+  - 运维与部署
+      - next.config.js：必要环境变量暴露策略（仅服务端），构建与运行优化。
+      - 部署脚本与文档：针对 Vercel 或 Vertex/Cloud Run 提供构建命令与变量配置
+  指引。可以
+      - 清理：归档/删除 Python 后端文件，保留文档记录迁移映射与差异说明。 这个不用删
+
+  Next Steps
+是vercel，API 路由风格（pages/api
+前端整合策略完全靠 next.js风格，以及 DeepSeek 需要流式响应。
+  - 确认后我将创建 deploy/ 下的 Next.js 工程、落地 API 路由骨架与数据/配置结构，然
+  后补齐逻辑与测试。
+
+  总结：在开发环境下，npm run dev 就足够启动 Next.js 项目。
+
+
+另外：不需要动其他所有代码，只能查看在 deploy/ 工作即可
