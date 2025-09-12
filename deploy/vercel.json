@@ -1,8 +1,1 @@
-{
-  "functions": {
-    "api/**/*": {
-      "runtime": "nodejs18.x",
-      "includeFiles": "data/merged_data.json"
-    }
-  }
-}
+{}

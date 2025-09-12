@@ -1,12 +1,23 @@
 import { getSession } from '../../../../src/lib/sessionStore';
 import { chatCompletion, streamChatCompletion } from '../../../../src/lib/deepseek';
 
+function inferEmotion(symptomsStr = '') {
+  const s = (symptomsStr || '').toLowerCase();
+  if (s.includes('焦虑')) return '焦虑';
+  if (s.includes('抑郁') || s.includes('低落')) return '低落';
+  if (s.includes('紧张') || s.includes('恐惧')) return '紧张';
+  if (s.includes('愤')) return '愤怒';
+  if (s.includes('社交')) return '紧张';
+  if (s.includes('家庭') || s.includes('压力')) return '压力';
+  return 'neutral';
+}
+
 function buildMessages(session, userMessage) {
   // Mimic Python message building: system + history + status system
   // History uses session.messages [{role: 'user'|'assistant', content}]
   const system = session.seeker_prompt || '';
   // Simple emotion + complaint estimation
-  const emotion = 'neutral';
+  const emotion = inferEmotion(session?.portrait?.symptoms || '');
   const complaint = Array.isArray(session.chain) && session.chain.length > 0
     ? (typeof session.chain[session.chain_index] === 'object' ? (session.chain[session.chain_index].content || String(session.chain[session.chain_index])) : String(session.chain[session.chain_index]))
     : 'unknown';

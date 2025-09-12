@@ -7,6 +7,7 @@ class DatasetLoader {
     this._loaded = false;
     this._mtime = 0;
     this._idToRecord = new Map();
+    this._source = 'fs'; // 'fs' | 'http'
   }
 
   _absPath() {
@@ -51,12 +52,50 @@ class DatasetLoader {
     this._idToRecord = map;
     this._mtime = stat.mtimeMs;
     this._loaded = true;
+    this._source = 'fs';
   }
 
   _ensureLoaded() {
     const p = this._absPath();
     const stat = fs.existsSync(p) ? fs.statSync(p) : { mtimeMs: 0 };
     if (!this._loaded || stat.mtimeMs !== this._mtime) this._loadFromDisk();
+  }
+
+  async ensureReady(baseUrl) {
+    // Try FS first
+    try {
+      this._loadFromDisk();
+      return;
+    } catch {}
+    // HTTP fallback: support MERGED_DATA_URL or infer from VERCEL_URL + public path
+    const explicitUrl = process.env.MERGED_DATA_URL && String(process.env.MERGED_DATA_URL).trim();
+    const vercelHost = (process.env.VERCEL_URL && String(process.env.VERCEL_URL).trim()) || '';
+    const base = explicitUrl ? null : (baseUrl || (vercelHost ? (`https://${vercelHost.replace(/^https?:\/\//,'')}`) : null));
+    const pathStr = String(this.datasetPath || '').replace(/^public\//, '');
+    const url = explicitUrl || (base ? `${base.replace(/\/$/, '')}/${pathStr}` : null);
+    if (!url) throw new Error('Dataset not found on disk and no URL available');
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`Failed to fetch dataset over HTTP: ${resp.status}`);
+    const data = await resp.json();
+    let records;
+    if (Array.isArray(data)) {
+      records = data;
+    } else if (data && typeof data === 'object') {
+      const values = Object.values(data);
+      if (values.every(v => v && typeof v === 'object')) records = values; else throw new Error('Unsupported dataset dict via HTTP');
+    } else {
+      throw new Error('Unsupported dataset type via HTTP');
+    }
+    const map = new Map();
+    for (const rec of records) {
+      if (rec && typeof rec === 'object' && rec.id != null) {
+        map.set(String(rec.id), rec);
+      }
+    }
+    this._idToRecord = map;
+    this._mtime = Date.now();
+    this._loaded = true;
+    this._source = 'http';
   }
 
   listIds() {

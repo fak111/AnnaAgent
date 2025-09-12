@@ -554,7 +554,7 @@ export default function Home() {
                     onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                     placeholder="请输入您的咨询回应..."
                     className="w-full p-4 pr-12 rounded-2xl bg-white/80 backdrop-blur-sm border-2 border-emerald-200/50 text-emerald-800 placeholder-emerald-500/70 resize-none focus:outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all shadow-lg"
-                    rows="1"
+                    rows={1}
                     style={{minHeight: '60px'}}
                   />
                 </div>
